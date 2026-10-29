@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: oggy-site-chkr
+    env: docker
+    plan: starter
+    autoDeploy: true
+    envVars:
+      - key: BOT_TOKEN
+        value: 8558886316:AAG3qGKnqX_o2nBb0NVRlM4E8B4oxRpCzKo
+      - key: ADMIN_ID
+        value: "8919487892"
+      - key: DEFAULT_PIN
+        value: OGGY-PROO
+      - key: DB_PATH
+        value: /data/oggy.db
+      - key: PORT
+        value: "10000"
+      - key: CONCURRENCY
+        value: "5"
+    disk:
+      name: oggy-data
+      mountPath: /data
+      sizeGB: 5
