@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: oggy-shopify-tools
+    name: oggy-tools
     env: docker
     plan: free
     autoDeploy: true
