@@ -2,7 +2,6 @@ import asyncio, random, re, logging
 from urllib.parse import quote_plus, unquote, urlparse
 import aiohttp
 from bs4 import BeautifulSoup
-from config import HTTP_TIMEOUT
 
 log = logging.getLogger("scraper")
 
@@ -12,8 +11,6 @@ UA = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
     "(KHTML, like Gecko) Version/17.4 Safari/605.1.15",
     "Mozilla/5.0 (X11; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/123.0 Safari/537.36 Edg/123.0.0.0",
 ]
 
 QUERY_TPL = [
@@ -22,7 +19,6 @@ QUERY_TPL = [
     '"{kw}" "myshopify.com"',
     '"powered by shopify" "{kw}"',
     '"{kw}" shopify store',
-    'site:myshopify.com "add to cart" "{kw}"',
 ]
 
 PRICE_RE = re.compile(
@@ -72,7 +68,7 @@ async def _fetch(session, url, proxy=None):
     try:
         async with session.get(
             url, proxy=proxy, headers=_headers(),
-            timeout=aiohttp.ClientTimeout(total=HTTP_TIMEOUT),
+            timeout=aiohttp.ClientTimeout(total=20),
             allow_redirects=True,
         ) as r:
             if r.status == 200:
@@ -115,40 +111,28 @@ async def _lowest_price(session, base, proxy=None):
         if not m:
             continue
         try:
-            p = float(m.group(1).replace(",", "."))
+            price = float(m.group(1).replace(",", "."))
         except ValueError:
             continue
-        if p <= 0:
+        if price <= 0:
             continue
         parent = el.find_parent(class_=re.compile("product|card|item", re.I))
         title = (parent.get_text(" ", strip=True) if parent else text)[:100]
-        if best is None or p < best[0]:
-            best = (p, title)
+        if best is None or price < best[0]:
+            best = (price, title)
     return best if best else (None, None)
 
 async def scrape_shopify(
-    keyword: str,
-    want: int,
-    max_price: float,
-    proxies: list[str],
-    on_hit,
-    stop_flag,
-    max_candidates: int = None,
+    keyword: str, want: int, max_price: float,
+    proxies: list[str], on_hit, stop_flag,
 ):
-    """
-    Scrape google for shopify candidates, verify, filter by max_price.
-    Calls await on_hit({"site":..., "price":..., "title":...}) per accepted site.
-    """
-    seen_roots = set()
+    seen = set()
     accepted = []
-
     def _pick():
         return random.choice(proxies) if proxies else None
-
     def _stop():
         return bool(stop_flag and stop_flag.get("stop"))
-
-    cap = max_candidates or max(want * 5, 60)
+    cap = max(want * 5, 60)
 
     async with aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar(unsafe=True)) as session:
         candidates = []
@@ -168,8 +152,8 @@ async def scrape_shopify(
                     continue
                 for raw in _parse_google(html):
                     root = _root(raw)
-                    if root and root not in seen_roots:
-                        seen_roots.add(root)
+                    if root and root not in seen:
+                        seen.add(root)
                         candidates.append(root)
                 await asyncio.sleep(random.uniform(1.2, 2.8))
 
